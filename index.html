@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Orbit Lab</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <section class="sim-pane">
+      <div class="canvas-wrap">
+        <canvas id="simCanvas" aria-label="Orbit simulation canvas"></canvas>
+        <div id="orbitExplainOverlay" class="orbit-explain-overlay hidden"></div>
+      </div>
+    </section>
+
+    <aside class="panel" id="sidePanel">
+      <h1>Orbit Lab</h1>
+
+      <section class="card controls">
+        <h2>Controls</h2>
+        <div class="row">
+          <label for="difficultySelect">Difficulty</label>
+          <select id="difficultySelect">
+            <option value="easy">EASY (Mouse Burns)</option>
+            <option value="hard">HARD (Console Only)</option>
+          </select>
+        </div>
+        <div class="button-row">
+          <button id="runBtn">Run Simulation</button>
+          <button id="pauseBtn">Pause</button>
+          <button id="resetBtn">Reset</button>
+        </div>
+        <div class="button-row">
+          <button id="burnBtn">Burn (B)</button>
+        </div>
+        <p id="statusText" class="status">Ready: press Run Simulation.</p>
+      </section>
+
+      <section class="card mission mission-big">
+        <h2>Mission Requirements</h2>
+        <p id="missionBand"></p>
+        <p id="missionSpeed"></p>
+        <p id="missionTangential"></p>
+        <p id="missionHold" class="hold-neon"></p>
+        <p id="missionEntry"></p>
+        <p id="missionRule"></p>
+        <p id="missionGuidance"></p>
+        <p id="missionProgress" class="hold-neon"></p>
+      </section>
+
+      <section class="card score">
+        <h2>Score</h2>
+        <p id="scoreLive">Score: 100</p>
+        <p id="dvLive">Delta-v: 0 / 0</p>
+        <p id="timeLive">Time: 0.0 / 0.0 s</p>
+        <p id="safetyLive">Safety penalties: 0</p>
+      </section>
+
+      <section class="card" id="consoleCard">
+        <h2>Maneuver Console (HARD)</h2>
+        <ul class="cmd-list">
+          <li><code>prograde &lt;dv&gt;</code> along velocity</li>
+          <li><code>retrograde &lt;dv&gt;</code> opposite velocity</li>
+          <li><code>radialout &lt;dv&gt;</code> away from planet</li>
+          <li><code>radialin &lt;dv&gt;</code> toward planet</li>
+          <li><code>wait &lt;seconds&gt;</code> delay command stream</li>
+          <li><code>execute</code> run queued commands</li>
+          <li><code>clear</code> clear queue</li>
+        </ul>
+        <div class="row">
+          <input id="consoleInput" type="text" placeholder="Type command and press Enter">
+        </div>
+        <div id="queueView" class="queue"></div>
+        <div id="consoleLog" class="log"></div>
+      </section>
+
+      <section class="card math-help">
+        <h2>Math Help</h2>
+        <p>Click a metric for the equation and meaning.</p>
+        <div class="metric-row">
+          <button class="help-btn" data-metric="vcirc">v_circ ?</button>
+          <button class="help-btn" data-metric="epsilon">epsilon ?</button>
+          <button class="help-btn" data-metric="h">h ?</button>
+          <button class="help-btn" data-metric="e">e ?</button>
+        </div>
+        <div id="helpBox" class="help-box"></div>
+      </section>
+
+      <section class="card options">
+        <h2>Options</h2>
+        <label><input type="checkbox" id="trailToggle" checked> Orbit trail</label>
+        <label><input type="checkbox" id="vectorsToggle" checked> Vectors</label>
+        <label><input type="checkbox" id="mathToggle" checked> Math HUD overlay</label>
+      </section>
+
+    </aside>
+  </main>
+
+  <section class="completion-banner hidden" id="completionBanner" role="status" aria-live="polite">
+    <button id="bannerCloseBtn" class="banner-close" aria-label="Close mission complete banner">x</button>
+    <div class="banner-title">Mission Complete</div>
+    <div class="banner-score" id="bannerScore"></div>
+    <div class="banner-medal">
+      <span class="medal-disc" id="bannerMedalIcon"></span>
+      <span id="bannerMedalLabel"></span>
+    </div>
+    <div class="banner-winwhy" id="bannerWinWhy"></div>
+    <div class="banner-breakdown" id="bannerBreakdown"></div>
+  </section>
+
+  <script src="main.js"></script>
+</body>
+</html>
