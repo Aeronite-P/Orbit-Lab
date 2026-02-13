@@ -946,6 +946,474 @@
     host.appendChild(overlay);
   }
 
+  const hardBackgroundCache = {
+    mode: null,
+    canvas: null,
+    twinkle: []
+  };
+
+  function invalidateHardBackgroundCache() {
+    hardBackgroundCache.canvas = null;
+    hardBackgroundCache.twinkle = [];
+  }
+
+  function buildHardBackgroundCache() {
+    const w = Math.max(1, Math.floor(state.camera.w));
+    const h = Math.max(1, Math.floor(state.camera.h));
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const bctx = c.getContext("2d");
+    const minDim = Math.min(w, h);
+
+    const deep = bctx.createLinearGradient(0, 0, 0, h);
+    deep.addColorStop(0, "#050a16");
+    deep.addColorStop(0.52, "#0a1230");
+    deep.addColorStop(1, "#1a1028");
+    bctx.fillStyle = deep;
+    bctx.fillRect(0, 0, w, h);
+
+    const clouds = 36;
+    const palette = [
+      [94, 132, 146],
+      [111, 97, 139],
+      [130, 93, 131]
+    ];
+    for (let i = 0; i < clouds; i += 1) {
+      const cx = randRange(-0.15 * w, 1.15 * w);
+      const cy = randRange(-0.1 * h, 1.1 * h);
+      const radius = randRange(minDim * 0.22, minDim * 0.5);
+      const color = palette[Math.floor(Math.random() * palette.length)];
+      let alpha = randRange(0.04, 0.12);
+      if (cx < w * 0.34 && cy < h * 0.34) alpha *= 0.55;
+      const g = bctx.createRadialGradient(cx, cy, radius * 0.1, cx, cy, radius);
+      g.addColorStop(0, `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${alpha.toFixed(3)})`);
+      g.addColorStop(0.58, `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${(alpha * 0.45).toFixed(3)})`);
+      g.addColorStop(1, `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0)`);
+      bctx.fillStyle = g;
+      bctx.beginPath();
+      bctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      bctx.fill();
+    }
+
+    const starCount = Math.floor((w * h) / 1900);
+    const twinkleStars = [];
+    for (let i = 0; i < starCount; i += 1) {
+      const p = Math.random();
+      let s;
+      let a;
+      if (p < 0.82) {
+        s = randRange(0.35, 1.05);
+        a = randRange(0.2, 0.55);
+      } else if (p < 0.97) {
+        s = randRange(1.05, 1.8);
+        a = randRange(0.32, 0.72);
+      } else {
+        s = randRange(1.8, 2.5);
+        a = randRange(0.5, 0.9);
+      }
+      const x = Math.random() * w;
+      const y = Math.random() * h;
+      bctx.globalAlpha = a;
+      bctx.fillStyle = "#d7e9ff";
+      bctx.beginPath();
+      bctx.arc(x, y, s, 0, Math.PI * 2);
+      bctx.fill();
+      if (Math.random() < 0.08) {
+        twinkleStars.push({
+          x,
+          y,
+          s: Math.max(0.5, s * 0.9),
+          baseA: Math.min(0.34, a * 0.42),
+          phase: Math.random() * Math.PI * 2,
+          speed: randRange(0.25, 0.65),
+          amp: randRange(0.035, 0.09)
+        });
+      }
+    }
+    bctx.globalAlpha = 1;
+
+    const vignette = bctx.createRadialGradient(w * 0.5, h * 0.5, minDim * 0.2, w * 0.5, h * 0.5, minDim * 0.88);
+    vignette.addColorStop(0, "rgba(0,0,0,0)");
+    vignette.addColorStop(1, "rgba(0,0,0,0.26)");
+    bctx.fillStyle = vignette;
+    bctx.fillRect(0, 0, w, h);
+
+    hardBackgroundCache.canvas = c;
+    hardBackgroundCache.twinkle = twinkleStars;
+  }
+
+  function drawBackground() {
+    const w = state.camera.w;
+    const h = state.camera.h;
+
+    if (hardBackgroundCache.mode !== state.difficulty) {
+      hardBackgroundCache.mode = state.difficulty;
+      invalidateHardBackgroundCache();
+    }
+
+    if (state.difficulty === "hard") {
+      if (!hardBackgroundCache.canvas || hardBackgroundCache.canvas.width !== w || hardBackgroundCache.canvas.height !== h) {
+        buildHardBackgroundCache();
+      }
+      ctx.drawImage(hardBackgroundCache.canvas, 0, 0, w, h);
+      if (hardBackgroundCache.twinkle.length > 0) {
+        const t = performance.now() * 0.00012;
+        ctx.save();
+        ctx.fillStyle = "#e4f0ff";
+        for (let i = 0; i < hardBackgroundCache.twinkle.length; i += 1) {
+          const s = hardBackgroundCache.twinkle[i];
+          const a = s.baseA + Math.sin(t * s.speed + s.phase) * s.amp;
+          if (a <= 0.01) continue;
+          ctx.globalAlpha = a;
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.s, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+      return;
+    }
+
+    const nebula = ctx.createRadialGradient(w * 0.25, h * 0.3, 10, w * 0.25, h * 0.3, w * 0.85);
+    nebula.addColorStop(0, "#123d5d");
+    nebula.addColorStop(0.4, "#0a223a");
+    nebula.addColorStop(1, "#040a12");
+    ctx.fillStyle = nebula;
+    ctx.fillRect(0, 0, w, h);
+    const nebula2 = ctx.createRadialGradient(w * 0.8, h * 0.2, 20, w * 0.8, h * 0.2, w * 0.55);
+    nebula2.addColorStop(0, "rgba(100,70,130,0.22)");
+    nebula2.addColorStop(1, "rgba(20,10,30,0)");
+    ctx.fillStyle = nebula2;
+    ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < state.stars.length; i += 1) {
+      const s = state.stars[i];
+      ctx.globalAlpha = s.a + Math.sin((performance.now() * 0.001) + i) * 0.08;
+      ctx.fillStyle = "#d8ecff";
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.s, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  const hardPlanetCache = {
+    mode: null,
+    key: "",
+    canvas: null
+  };
+  const easyPlanetCache = {
+    key: "",
+    canvas: null
+  };
+  let planetVisualMode = null;
+
+  function drawSoftEllipseBlob(targetCtx, cx, cy, rx, ry, rot, rgbaCore, rgbaEdge) {
+    targetCtx.save();
+    targetCtx.translate(cx, cy);
+    targetCtx.rotate(rot);
+    targetCtx.scale(1, ry / Math.max(1e-6, rx));
+    const g = targetCtx.createRadialGradient(0, 0, rx * 0.18, 0, 0, rx);
+    g.addColorStop(0, rgbaCore);
+    g.addColorStop(1, rgbaEdge);
+    targetCtx.fillStyle = g;
+    targetCtx.beginPath();
+    targetCtx.arc(0, 0, rx, 0, Math.PI * 2);
+    targetCtx.fill();
+    targetCtx.restore();
+  }
+
+  function buildEasyPlanetSprite() {
+    const r = config.planetRadius * config.pxPerUnit;
+    const atm = config.atmosphereThickness * config.pxPerUnit;
+    const pad = Math.ceil(r + atm + 20);
+    const size = pad * 2;
+    const sprite = document.createElement("canvas");
+    sprite.width = size;
+    sprite.height = size;
+    const pctx = sprite.getContext("2d");
+    const cx = size / 2;
+    const cy = size / 2;
+
+    const outerAtm = pctx.createRadialGradient(cx, cy, r * 0.95, cx, cy, r + atm * 0.9);
+    outerAtm.addColorStop(0, "rgba(120, 205, 255, 0.18)");
+    outerAtm.addColorStop(1, "rgba(120, 205, 255, 0)");
+    pctx.fillStyle = outerAtm;
+    pctx.beginPath();
+    pctx.arc(cx, cy, r + atm, 0, Math.PI * 2);
+    pctx.fill();
+
+    const ocean = pctx.createRadialGradient(cx - r * 0.42, cy - r * 0.34, r * 0.12, cx, cy, r);
+    ocean.addColorStop(0, "#709fbe");
+    ocean.addColorStop(0.5, "#2a668f");
+    ocean.addColorStop(1, "#163a58");
+    pctx.fillStyle = ocean;
+    pctx.beginPath();
+    pctx.arc(cx, cy, r, 0, Math.PI * 2);
+    pctx.fill();
+
+    pctx.save();
+    pctx.beginPath();
+    pctx.arc(cx, cy, r, 0, Math.PI * 2);
+    pctx.clip();
+
+    const largeContinents = [
+      { x: -0.43, y: -0.22, rx: 0.36, ry: 0.22, rot: -0.55, tint: 0 },
+      { x: -0.11, y: -0.02, rx: 0.34, ry: 0.2, rot: 0.23, tint: 1 },
+      { x: 0.28, y: -0.18, rx: 0.3, ry: 0.18, rot: 0.56, tint: 0 },
+      { x: 0.36, y: 0.13, rx: 0.27, ry: 0.16, rot: -0.28, tint: 2 },
+      { x: -0.27, y: 0.23, rx: 0.3, ry: 0.18, rot: 0.36, tint: 0 },
+      { x: 0.03, y: 0.22, rx: 0.26, ry: 0.15, rot: -0.18, tint: 1 }
+    ];
+    const mediumPatches = [
+      { x: -0.02, y: -0.34, rx: 0.16, ry: 0.09, rot: 0.1, tint: 1 },
+      { x: 0.12, y: -0.36, rx: 0.14, ry: 0.08, rot: -0.42, tint: 0 },
+      { x: -0.35, y: 0.06, rx: 0.18, ry: 0.11, rot: 0.62, tint: 2 },
+      { x: 0.18, y: 0.34, rx: 0.16, ry: 0.1, rot: 0.48, tint: 1 },
+      { x: -0.48, y: -0.02, rx: 0.13, ry: 0.08, rot: -0.1, tint: 0 },
+      { x: 0.46, y: -0.04, rx: 0.12, ry: 0.07, rot: 0.25, tint: 2 },
+      { x: -0.19, y: 0.4, rx: 0.11, ry: 0.07, rot: 0.15, tint: 1 }
+    ];
+    const islandClusters = [
+      { x: -0.52, y: -0.16, rx: 0.08, ry: 0.05, rot: 0.12, tint: 0 },
+      { x: -0.46, y: 0.2, rx: 0.07, ry: 0.045, rot: -0.42, tint: 1 },
+      { x: -0.31, y: 0.42, rx: 0.07, ry: 0.04, rot: 0.52, tint: 2 },
+      { x: 0.12, y: 0.44, rx: 0.065, ry: 0.04, rot: -0.25, tint: 0 },
+      { x: 0.42, y: 0.32, rx: 0.07, ry: 0.045, rot: 0.31, tint: 1 },
+      { x: 0.53, y: 0.09, rx: 0.06, ry: 0.038, rot: -0.12, tint: 2 },
+      { x: 0.5, y: -0.24, rx: 0.075, ry: 0.045, rot: 0.49, tint: 0 },
+      { x: -0.04, y: -0.46, rx: 0.06, ry: 0.036, rot: -0.62, tint: 1 }
+    ];
+    const landPalette = [
+      ["rgba(86, 136, 72, 0.47)", "rgba(86, 136, 72, 0)"],
+      ["rgba(102, 146, 78, 0.44)", "rgba(102, 146, 78, 0)"],
+      ["rgba(124, 111, 82, 0.26)", "rgba(124, 111, 82, 0)"]
+    ];
+    function drawLandGroup(group, sizeMul, alphaMul, textureCount) {
+      group.forEach((c) => {
+        const bx = cx + c.x * r;
+        const by = cy + c.y * r;
+        const land = landPalette[c.tint % landPalette.length];
+        drawSoftEllipseBlob(
+          pctx,
+          bx + r * 0.008,
+          by + r * 0.008,
+          c.rx * r * (sizeMul * 1.08),
+          c.ry * r * (sizeMul * 1.05),
+          c.rot,
+          `rgba(72, 84, 64, ${(0.08 * alphaMul).toFixed(3)})`,
+          "rgba(72, 84, 64, 0)"
+        );
+        drawSoftEllipseBlob(
+          pctx,
+          bx,
+          by,
+          c.rx * r * sizeMul,
+          c.ry * r * sizeMul,
+          c.rot,
+          land[0].replace(/0\.\d+\)/, `${(parseFloat(land[0].match(/0\.\d+/)[0]) * alphaMul).toFixed(3)})`),
+          land[1]
+        );
+        drawSoftEllipseBlob(
+          pctx,
+          bx - r * 0.018,
+          by + r * 0.01,
+          c.rx * r * sizeMul * 0.68,
+          c.ry * r * sizeMul * 0.62,
+          c.rot + 0.14,
+          `rgba(112, 96, 70, ${(0.12 * alphaMul).toFixed(3)})`,
+          "rgba(112, 96, 70, 0)"
+        );
+        for (let t = 0; t < textureCount; t += 1) {
+          const ox = randRange(-0.55, 0.55) * c.rx * r * sizeMul;
+          const oy = randRange(-0.55, 0.55) * c.ry * r * sizeMul;
+          const texSize = randRange(r * 0.012, r * 0.028) * sizeMul;
+          const texCore = Math.random() > 0.5
+            ? `rgba(82, 122, 68, ${randRange(0.035, 0.065).toFixed(3)})`
+            : `rgba(118, 102, 76, ${randRange(0.02, 0.048).toFixed(3)})`;
+          drawSoftEllipseBlob(
+            pctx,
+            bx + ox,
+            by + oy,
+            texSize,
+            texSize * randRange(0.62, 1.45),
+            randRange(-0.9, 0.9),
+            texCore,
+            "rgba(0, 0, 0, 0)"
+          );
+        }
+      });
+    }
+    drawLandGroup(largeContinents, 1, 1, 3);
+    drawLandGroup(mediumPatches, 0.9, 0.92, 2);
+    drawLandGroup(islandClusters, 0.72, 0.88, 1);
+
+    const clouds = [
+      { x: -0.3, y: -0.07, rx: 0.24, ry: 0.07, rot: -0.22, a: 0.12 },
+      { x: 0.15, y: -0.14, rx: 0.22, ry: 0.062, rot: 0.18, a: 0.11 },
+      { x: 0.07, y: 0.21, rx: 0.26, ry: 0.078, rot: -0.45, a: 0.1 },
+      { x: -0.08, y: 0.3, rx: 0.2, ry: 0.055, rot: 0.12, a: 0.095 }
+    ];
+    clouds.forEach((cl) => {
+      drawSoftEllipseBlob(
+        pctx,
+        cx + cl.x * r,
+        cy + cl.y * r,
+        cl.rx * r,
+        cl.ry * r,
+        cl.rot,
+        `rgba(248, 252, 255, ${cl.a.toFixed(3)})`,
+        "rgba(248, 252, 255, 0)"
+      );
+    });
+
+    const terminator = pctx.createLinearGradient(cx - r * 0.18, cy, cx + r * 1.03, cy);
+    terminator.addColorStop(0, "rgba(11, 33, 51, 0)");
+    terminator.addColorStop(1, "rgba(11, 33, 51, 0.34)");
+    pctx.fillStyle = terminator;
+    pctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    pctx.restore();
+
+    pctx.strokeStyle = "rgba(138, 218, 255, 0.34)";
+    pctx.lineWidth = 1.5;
+    pctx.beginPath();
+    pctx.arc(cx, cy, r + 0.5, 0, Math.PI * 2);
+    pctx.stroke();
+
+    easyPlanetCache.canvas = sprite;
+  }
+
+  function drawHardRingBands(targetCtx, cx, cy, innerRx, outerRx, innerRy, outerRy, alphaScale) {
+    const bands = 34;
+    for (let i = 0; i < bands; i += 1) {
+      const t = i / Math.max(1, bands - 1);
+      const rx = innerRx + (outerRx - innerRx) * t;
+      const ry = innerRy + (outerRy - innerRy) * t;
+      const edgeFade = 1 - Math.abs(t - 0.5) * 1.7;
+      const cassiniDip = Math.abs(t - 0.6) < 0.045 ? 0.28 : 1;
+      const a = clamp((0.028 + edgeFade * 0.07) * cassiniDip * alphaScale, 0, 0.18);
+      const warm = 172 + Math.floor(20 * t);
+      const cool = 176 + Math.floor(14 * (1 - t));
+      targetCtx.strokeStyle = `rgba(${warm}, ${cool}, ${188 + Math.floor(12 * t)}, ${a.toFixed(3)})`;
+      targetCtx.lineWidth = 1 + (t > 0.72 ? 0.2 : 0);
+      targetCtx.beginPath();
+      targetCtx.ellipse(cx, cy, rx, ry, -0.22, 0, Math.PI * 2);
+      targetCtx.stroke();
+    }
+  }
+
+  function buildHardPlanetSprite() {
+    const r = config.planetRadius * config.pxPerUnit;
+    const atm = config.atmosphereThickness * config.pxPerUnit;
+    const outerRingRx = r * 2.15;
+    const outerRingRy = r * 0.62;
+    const pad = Math.ceil(Math.max(outerRingRx, r + atm) + 22);
+    const size = pad * 2;
+    const sprite = document.createElement("canvas");
+    sprite.width = size;
+    sprite.height = size;
+    const pctx = sprite.getContext("2d");
+    const cx = size / 2;
+    const cy = size / 2;
+
+    const innerRingRx = r * 1.32;
+    const innerRingRy = r * 0.38;
+
+    pctx.save();
+    pctx.beginPath();
+    pctx.rect(0, 0, size, cy + 1);
+    pctx.clip();
+    drawHardRingBands(pctx, cx, cy, innerRingRx, outerRingRx, innerRingRy, outerRingRy, 0.9);
+    pctx.restore();
+
+    pctx.save();
+    const atmGlow = pctx.createRadialGradient(cx, cy, r * 0.92, cx, cy, r + atm * 0.96);
+    atmGlow.addColorStop(0, "rgba(210, 196, 168, 0.16)");
+    atmGlow.addColorStop(1, "rgba(210, 196, 168, 0)");
+    pctx.fillStyle = atmGlow;
+    pctx.beginPath();
+    pctx.arc(cx, cy, r + atm, 0, Math.PI * 2);
+    pctx.fill();
+
+    const sphere = pctx.createRadialGradient(cx - r * 0.42, cy - r * 0.36, r * 0.12, cx, cy, r);
+    sphere.addColorStop(0, "#e8d9b9");
+    sphere.addColorStop(0.58, "#c8af86");
+    sphere.addColorStop(1, "#8d7354");
+    pctx.fillStyle = sphere;
+    pctx.beginPath();
+    pctx.arc(cx, cy, r, 0, Math.PI * 2);
+    pctx.fill();
+
+    pctx.beginPath();
+    pctx.arc(cx, cy, r, 0, Math.PI * 2);
+    pctx.clip();
+    for (let y = -r; y <= r; y += Math.max(2, r * 0.075)) {
+      const normalized = (y + r) / (2 * r);
+      const stripe = 0.03 + 0.03 * Math.sin(normalized * Math.PI * 10.5);
+      pctx.fillStyle = `rgba(120, 98, 74, ${stripe.toFixed(3)})`;
+      pctx.fillRect(cx - r, cy + y, r * 2, Math.max(1.4, r * 0.04));
+    }
+    const terminator = pctx.createLinearGradient(cx - r * 0.1, cy, cx + r * 1.05, cy);
+    terminator.addColorStop(0, "rgba(44,32,22,0)");
+    terminator.addColorStop(1, "rgba(44,32,22,0.34)");
+    pctx.fillStyle = terminator;
+    pctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+
+    pctx.fillStyle = "rgba(35, 31, 28, 0.12)";
+    pctx.beginPath();
+    pctx.ellipse(cx + r * 0.02, cy + r * 0.03, r * 1.08, r * 0.29, -0.22, 0, Math.PI * 2);
+    pctx.fill();
+    pctx.restore();
+
+    pctx.strokeStyle = "rgba(236, 221, 185, 0.24)";
+    pctx.lineWidth = 1.8;
+    pctx.beginPath();
+    pctx.arc(cx, cy, r, 0, Math.PI * 2);
+    pctx.stroke();
+
+    pctx.save();
+    pctx.beginPath();
+    pctx.rect(0, cy - 1, size, size - cy + 1);
+    pctx.clip();
+    drawHardRingBands(pctx, cx, cy, innerRingRx, outerRingRx, innerRingRy, outerRingRy, 1.08);
+    pctx.restore();
+
+    hardPlanetCache.canvas = sprite;
+  }
+
+  function drawPlanet() {
+    const center = worldToScreen({ x: 0, y: 0 });
+    const r = config.planetRadius * config.pxPerUnit;
+
+    if (planetVisualMode !== state.difficulty) {
+      planetVisualMode = state.difficulty;
+      easyPlanetCache.canvas = null;
+      easyPlanetCache.key = "";
+      hardPlanetCache.mode = state.difficulty;
+      hardPlanetCache.canvas = null;
+      hardPlanetCache.key = "";
+    }
+
+    if (state.difficulty === "hard") {
+      const key = `${state.camera.w}x${state.camera.h}:${r.toFixed(2)}`;
+      if (!hardPlanetCache.canvas || hardPlanetCache.key !== key) {
+        hardPlanetCache.key = key;
+        buildHardPlanetSprite();
+      }
+      const sprite = hardPlanetCache.canvas;
+      ctx.drawImage(sprite, center.x - sprite.width / 2, center.y - sprite.height / 2);
+      return;
+    }
+
+    const easyKey = `${state.camera.w}x${state.camera.h}:${r.toFixed(2)}`;
+    if (!easyPlanetCache.canvas || easyPlanetCache.key !== easyKey) {
+      easyPlanetCache.key = easyKey;
+      buildEasyPlanetSprite();
+    }
+    const easySprite = easyPlanetCache.canvas;
+    ctx.drawImage(easySprite, center.x - easySprite.width / 2, center.y - easySprite.height / 2);
+  }
+
   function boot() {
     ensureCanvasAttribution();
     ensureTutorialTooltip();
