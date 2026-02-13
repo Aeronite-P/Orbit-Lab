@@ -68,6 +68,7 @@
   const state = {
     running: false,
     paused: true,
+    missionStarted: false,
     difficulty: "easy",
     controlMode: "mouse",
     fuel: config.fuelMax,
@@ -200,13 +201,18 @@
     const r0 = chooseSpawnRadius();
     const theta = Math.random() * Math.PI * 2;
     const rHat = { x: Math.cos(theta), y: Math.sin(theta) };
-    const tHat = { x: -Math.sin(theta), y: Math.cos(theta) };
+    const tHat = norm({ x: -rHat.y, y: rHat.x });
     const vc0 = Math.sqrt(config.mu / r0);
-    const vDir = state.difficulty === "hard" ? rotate(tHat, randRange(-24, 24) * (Math.PI / 180)) : rotate(tHat, randRange(-8, 8) * (Math.PI / 180));
-    const vMag = state.difficulty === "hard" ? vc0 * randRange(0.65, 1.35) : vc0 * randRange(0.94, 1.06);
-    const radialKick = (state.difficulty === "hard" ? randRange(-0.07, 0.07) : randRange(-0.03, 0.03)) * vc0;
+    let vDir = tHat;
+    let vMag = vc0;
+    if (state.difficulty === "hard") {
+      const eSpeed = randRange(-0.06, 0.06);
+      const eAngleDeg = randRange(-6, 6);
+      vDir = norm(rotate(tHat, eAngleDeg * (Math.PI / 180)));
+      vMag = vc0 * (1 + eSpeed);
+    }
     state.sat.r = scale(rHat, r0);
-    state.sat.v = add(scale(norm(vDir), vMag), scale(rHat, radialKick));
+    state.sat.v = scale(vDir, vMag);
     state.hasBeenOutsideBand = !isInsideBand(r0);
   }
 
@@ -803,6 +809,10 @@
       setMessage(state.difficulty === "hard" ? "HARD mode: use console commands." : "EASY mode: mouse burns enabled.");
     });
     ui.runBtn.addEventListener("click", () => {
+      if (!state.missionStarted) {
+        setMessage("Choose a difficulty and click Start Mission.");
+        return;
+      }
       state.running = true;
       state.paused = false;
       setMessage("Simulation running.");
@@ -872,8 +882,74 @@
     host.appendChild(tag);
   }
 
+  function ensureTutorialTooltip() {
+    const panel = document.querySelector(".panel");
+    if (!panel || panel.querySelector(".tutorial-wrap")) return;
+    const header = panel.querySelector("h1");
+    const wrap = document.createElement("div");
+    wrap.className = "tutorial-wrap";
+    wrap.innerHTML =
+      `<span class="tutorial-trigger">Tutorial?</span>` +
+      `<div class="tutorial-tooltip">Goal: Enter the target orbit band and keep the required speed until the hold timer finishes. Easy mode: drag from the satellite to aim a burn, then press Burn. Hard mode: queue console commands and press Execute, then use Pause or Reset to retry.</div>`;
+    if (header) {
+      header.insertAdjacentElement("afterend", wrap);
+    } else {
+      panel.prepend(wrap);
+    }
+  }
+
+  function ensureStartOverlay() {
+    const host = canvas.parentElement;
+    if (!host || host.querySelector(".start-overlay")) return;
+    let selectedDifficulty = "easy";
+
+    const overlay = document.createElement("div");
+    overlay.className = "start-overlay";
+    overlay.innerHTML =
+      `<div class="start-panel">` +
+      `<h2 class="start-title">Orbit Lab</h2>` +
+      `<p class="start-help">Choose a difficulty to begin.</p>` +
+      `<div class="start-difficulty-row">` +
+      `<button type="button" class="start-difficulty-btn active" data-difficulty="easy">Easy</button>` +
+      `<button type="button" class="start-difficulty-btn" data-difficulty="hard">Hard</button>` +
+      `</div>` +
+      `<button type="button" class="start-primary">Start Mission</button>` +
+      `</div>`;
+
+    const difficultyButtons = Array.from(overlay.querySelectorAll(".start-difficulty-btn"));
+    const startBtn = overlay.querySelector(".start-primary");
+
+    function syncStartDifficultyButtons() {
+      difficultyButtons.forEach((btn) => {
+        btn.classList.toggle("active", btn.getAttribute("data-difficulty") === selectedDifficulty);
+      });
+    }
+
+    difficultyButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        selectedDifficulty = btn.getAttribute("data-difficulty") === "hard" ? "hard" : "easy";
+        syncStartDifficultyButtons();
+      });
+    });
+
+    startBtn.addEventListener("click", () => {
+      ui.difficultySelect.value = selectedDifficulty;
+      syncDifficulty();
+      resetSimulation();
+      state.missionStarted = true;
+      state.running = true;
+      state.paused = false;
+      setMessage("Simulation running.");
+      overlay.remove();
+    });
+
+    host.appendChild(overlay);
+  }
+
   function boot() {
     ensureCanvasAttribution();
+    ensureTutorialTooltip();
+    ensureStartOverlay();
     hookEvents();
     resizeCanvasToFit();
     syncDifficulty();
