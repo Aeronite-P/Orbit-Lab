@@ -3,6 +3,9 @@
 Orbit Lab is a 2D orbital mechanics game that runs by opening `index.html` directly in a browser.  
 No framework, no build step, no server.
 
+IMPORTANT PLEASE READ:
+To Partake in the lab --> download every file above, then run index.html, if the satelite spawns inside the target orbit band then hold control and click the minus button on your keyboard to make the screen larger (if you make it too large, hold control and tap the plus button to zoom in again).
+
 ## Files
 - `index.html`: App structure and UI sections.
 - `style.css`: Responsive layout and visual design.
